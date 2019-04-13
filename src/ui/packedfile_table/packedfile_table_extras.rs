@@ -35,8 +35,8 @@ use cpp_utils::StaticCast;
 use std::cmp::Ordering;
 
 use crate::SETTINGS;
-use crate::QString;
-use crate::AppUI;
+use crate::ui_thread::QString;
+use crate::ui_thread::AppUI;
 use crate::packedfile::db::schemas::{FieldType, TableDefinition};
 
 /// This function creates the entire "Apply Maths" dialog for tables. It returns the operation to apply.

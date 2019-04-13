@@ -8,8 +8,50 @@
 // https://github.com/Frodo45127/rpfm/blob/master/LICENSE.
 //---------------------------------------------------------------------------//
 
-// Here are functions that were part of main, but the file got too big to search them efficiently.
-// If you need to turn something from main.rs into a function, put the function here.
+// Here are functions that were part of ui_thread, but the file got too big to search them efficiently.
+// If you need to turn something from ui_thread.rs into a function, put the function here.
+
+use qt_widgets::action::Action;
+use qt_widgets::combo_box::ComboBox;
+use qt_widgets::file_dialog::FileDialog;
+use qt_widgets::grid_layout::GridLayout;
+use qt_widgets::layout::Layout;
+use qt_widgets::line_edit::LineEdit;
+use qt_widgets::menu::Menu;
+use qt_widgets::push_button::PushButton;
+use qt_widgets::widget::Widget;
+
+use qt_core::connection::Signal;
+use qt_core::qt::CaseSensitivity;
+use qt_core::slots::SlotBool;
+use qt_core::sort_filter_proxy_model::SortFilterProxyModel;
+use qt_core::reg_exp::RegExp;
+
+use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::mpsc::{Sender, Receiver};
+use std::ffi::OsStr;
+use std::panic;
+use std::path::PathBuf;
+use std::fs::{DirBuilder, copy, remove_file, remove_dir_all};
+
+use chrono::NaiveDateTime;
+
+use crate::common::*;
+use crate::common::communications::*;
+use crate::error::{ErrorKind, Result};
+use crate::packfile::{PFHVersion, PFHFileType, PFHFlags};
+use crate::ui::*;
+use crate::ui::packedfile_table::PackedFileTableView;
+use crate::ui::packedfile_table::packedfile_db::*;
+use crate::ui::packedfile_table::packedfile_loc::*;
+use crate::ui::packedfile_text::*;
+use crate::ui::packedfile_rigidmodel::*;
+use crate::ui::packfile_treeview::*;
+use crate::ui::qt_custom_stuff::*;
+use crate::ui::table_state::*;
+
 use super::*;
 
 /// This function opens the PackFile at the provided Path, and sets all the stuff needed, depending

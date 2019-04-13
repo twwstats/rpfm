@@ -38,10 +38,10 @@ use std::path::{Path, PathBuf};
 
 use crate::SUPPORTED_GAMES;
 use crate::SETTINGS;
-use crate::AppUI;
+use crate::ui_thread::AppUI;
 use crate::Commands;
 use crate::Data;
-use crate::QString;
+use crate::ui_thread::QString;
 use crate::common::*;
 use crate::common::communications::*;
 use crate::error::ErrorKind;

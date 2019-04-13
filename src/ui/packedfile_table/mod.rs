@@ -50,8 +50,8 @@ use std::collections::BTreeMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::TABLE_STATES_UI;
-use crate::QString;
+use crate::ui_thread::TABLE_STATES_UI;
+use crate::ui_thread::QString;
 use crate::ui::*;
 use crate::packedfile::db::DB;
 use crate::packedfile::loc::Loc;

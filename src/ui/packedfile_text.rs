@@ -22,7 +22,7 @@ use std::rc::Rc;
 
 use crate::SUPPORTED_GAMES;
 use crate::GAME_SELECTED;
-use crate::AppUI;
+use crate::ui_thread::AppUI;
 use crate::Commands;
 use crate::Data;
 use crate::common::communications::*;

@@ -22,12 +22,12 @@ use serde_derive::{Serialize, Deserialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::TREEVIEW_ICONS;
-use crate::IS_MODIFIED;
-use crate::AppUI;
-use crate::QString;
-use crate::ui::*;
 use crate::packfile::PathType;
+use crate::ui::*;
+use crate::ui_thread::IS_MODIFIED;
+use crate::ui_thread::TREEVIEW_ICONS;
+use crate::ui_thread::AppUI;
+use crate::ui_thread::QString;
 
 //----------------------------------------------------------------//
 // Enums and Structs for the TreeView.

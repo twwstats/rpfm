@@ -29,8 +29,8 @@ use std::io::BufReader;
 
 use crate::RPFM_PATH;
 use crate::VERSION;
-use crate::AppUI;
-use crate::QString;
+use crate::ui_thread::AppUI;
+use crate::ui_thread::QString;
 use crate::Commands;
 use crate::Data;
 use crate::common::*;

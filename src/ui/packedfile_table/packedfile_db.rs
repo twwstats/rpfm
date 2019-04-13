@@ -17,7 +17,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc::{Sender, Receiver};
 
-use crate::AppUI;
+use crate::ui_thread::AppUI;
 use crate::Commands;
 use crate::Data;
 use crate::common::*;

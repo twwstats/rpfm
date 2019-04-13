@@ -1,5 +1,5 @@
 [package]
-name = "rpfm-code"
+name = "rpfm"
 version = "1.5.1"
 authors = ["Frodo45127 <frodo_gv@hotmail.com>"]
 build = "build.rs"
@@ -24,6 +24,7 @@ reqwest = "0.9"
 open = "*"
 indexmap = "1.0"
 regex = "1"
+clap = "2"
 
 qt_core = "0.2"
 qt_gui = "0.2"
