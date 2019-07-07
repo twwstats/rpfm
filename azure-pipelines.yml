@@ -15,6 +15,7 @@ steps:
   - script: |
       wget https://download.qt.io/archive/qt/5.13/5.13.0/qt-opensource-linux-x64-5.13.0.run
       chmod +x qt-opensource-linux-x64-5.13.0.run
+      ./qt-opensource-linux-x64-5.13.0.run
     displayName: Install Qt5
 
   - script: |
