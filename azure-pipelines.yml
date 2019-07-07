@@ -13,21 +13,19 @@ steps:
     displayName: Install Rust
 
   - script: |
-      sudo add-apt-repository ppa:beineri/opt-qt-5.12.3-xenial
-      sudo apt-get update
-      sudo apt install qt512-meta-full
-      source /opt/qt512/bin/qt512-env.sh
-    displayName: Install Qt5
-
-  - script: |
       sudo apt install xz-utils p7zip-full
     displayName: Install Compression Utilities
 
   - script: |
-      source /opt/qt512/bin/qt512-env.sh
-      qmake -v
-      cargo build --all
-    displayName: Cargo build
+      sudo add-apt-repository ppa:beineri/opt-qt-5.12.3-xenial
+      sudo apt-get update
+      sudo apt install qt512-meta-full
+    displayName: Install Qt5
 
-  - script: cargo test --all
-    displayName: Cargo test
+  - script: |
+      source /opt/qt512/bin/qt512-env.sh
+      cat /opt/qt512/bin/qt512-env.sh
+      cargo build
+      cargo test
+    displayName: Cargo Build & Test
+
