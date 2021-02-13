@@ -40,7 +40,7 @@ pub fn add_files(
 
 	// Load the PackFile and the different PackedFiles to memory.
 	let packfile_path = PathBuf::from(packfile);
-	let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+	let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
 	let destination_path = if destination_path == "." { vec![] } else { destination_path.split('/').map(|x| x.to_owned()).collect::<Vec<String>>() };
     let packed_file_paths = packed_file_path.iter()
@@ -73,7 +73,7 @@ pub fn add_folders(
 
 	// Load the PackFile and the different PackedFiles to memory.
 	let packfile_path = PathBuf::from(packfile);
-	let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+	let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
     let destination_path = if destination_path == "." { vec![] } else { destination_path.split('/').map(|x| x.to_owned()).collect::<Vec<String>>() };
     let folder_paths = folder_paths.iter()
@@ -106,7 +106,7 @@ pub fn delete_files(
 
     // Load the PackFile and the different PackedFiles to memory.
     let packfile_path = PathBuf::from(packfile);
-    let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+    let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
     paths.iter().map(|x| x.split('/').map(|x| x.to_owned()).collect::<Vec<String>>())
         .for_each(|x| packfile.remove_packed_file_by_path(&x));
@@ -131,7 +131,7 @@ pub fn delete_folders(
 
     // Load the PackFile and the different PackedFiles to memory.
     let packfile_path = PathBuf::from(packfile);
-    let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+    let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
     paths.iter().map(|x| x.split('/').map(|x| x.to_owned()).collect::<Vec<String>>())
         .for_each(|x| { packfile.remove_packed_files_by_type(&[PathType::Folder(x)]); });
@@ -161,7 +161,7 @@ pub fn extract_files(
 
 	// Load the PackFile and the different PackedFiles to memory.
 	let packfile_path = PathBuf::from(packfile);
-	let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+	let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
 	let result = paths.iter().map(|x| x.split('/').map(|x| x.to_owned()).collect::<Vec<String>>())
         .try_for_each(|x| packfile.extract_packed_file_by_path(&x, &destination_path));
@@ -191,7 +191,7 @@ pub fn extract_folders(
 
     // Load the PackFile and the different PackedFiles to memory.
     let packfile_path = PathBuf::from(packfile);
-    let mut packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+    let mut packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
     let paths = paths.iter().map(|x| x.split('/').map(|x| x.to_owned()).collect::<Vec<String>>()).map(PathType::Folder).collect::<Vec<PathType>>();
     packfile.extract_packed_files_by_type(&paths, &destination_path)?;
@@ -209,7 +209,7 @@ pub fn list_packfile_contents(config: &Config, packfile: &str) -> Result<()> {
 		info!("Listing PackFile Contents.");
 	}
 	let packfile_path = PathBuf::from(packfile);
-	let packfile = PackFile::open_packfiles(&[packfile_path], true, false, false)?;
+	let packfile = PackFile::open_packfiles(&[packfile_path], None, true, false, false)?;
 
 	let mut table = Table::new();
     table.add_row(row!["PackedFile Path", "Type", "Size"]);

@@ -96,7 +96,7 @@ fn check_content() -> String {
     };
 
     let mut movie_files = files.iter()
-        .filter_map(|x| PackFile::read(x, true).ok())
+        .filter_map(|x| PackFile::read(x, &None, true).ok())
         .filter(|y| y.get_pfh_file_type() == PFHFileType::Movie)
         .map(|z| z.get_file_path().to_str().unwrap().to_owned())
         .collect::<Vec<String>>();

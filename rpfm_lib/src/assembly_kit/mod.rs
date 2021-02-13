@@ -113,7 +113,7 @@ pub fn update_schema_from_raw_files(ass_kit_path: Option<PathBuf>, dependencies:
         match raw_db_version {
             2 | 1 => {
                 if let Some(packfile_db_path) = get_game_selected_db_pack_path() {
-                    let packfile_db = PackFile::open_packfiles(&packfile_db_path, true, false, false)?;
+                    let packfile_db = PackFile::open_packfiles(&packfile_db_path, None, true, false, false)?;
 
                     let mut ass_kit_schemas_path =
                         if raw_db_version == 1 {

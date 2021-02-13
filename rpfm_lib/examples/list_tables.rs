@@ -18,7 +18,7 @@ use rpfm_lib::packfile::PackFile;
 use rpfm_lib::packedfile::PackedFileType;
 
 fn main() {
-    match PackFile::read(&PathBuf::from("test_files/example_list_tables.pack"), true) {
+    match PackFile::read(&PathBuf::from("test_files/example_list_tables.pack"), None, true) {
         Ok(packfile) => {
             let packed_files = packfile.get_ref_packed_files_by_type(PackedFileType::DB, false);
             if packed_files.is_empty() {

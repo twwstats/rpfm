@@ -98,7 +98,7 @@ pub fn background_loop() {
 
             // In case we want to "Open one or more PackFiles"...
             Command::OpenPackFiles(paths) => {
-                match PackFile::open_packfiles(&paths, SETTINGS.read().unwrap().settings_bool["use_lazy_loading"], false, false) {
+                match PackFile::open_packfiles(&paths, None, SETTINGS.read().unwrap().settings_bool["use_lazy_loading"], false, false) {
                     Ok(pack_file) => {
                         pack_file_decoded = pack_file;
 
@@ -120,7 +120,7 @@ pub fn background_loop() {
             Command::OpenPackFileExtra(path) => {
                 match pack_files_decoded_extra.get(&path) {
                     Some(pack_file) => CENTRAL_COMMAND.send_message_rust(Response::PackFileInfo(PackFileInfo::from(pack_file))),
-                    None => match PackFile::open_packfiles(&[path.to_path_buf()], true, false, true) {
+                    None => match PackFile::open_packfiles(&[path.to_path_buf()], None, true, false, true) {
                          Ok(pack_file) => {
                             CENTRAL_COMMAND.send_message_rust(Response::PackFileInfo(PackFileInfo::from(&pack_file)));
                             pack_files_decoded_extra.insert(path.to_path_buf(), pack_file);
@@ -1023,7 +1023,11 @@ pub fn background_loop() {
                 }
             }
 
-            Command::RebuildDependencies => dependencies.rebuild(pack_file_decoded.get_packfiles_list()),
+            Command::RebuildDependencies => {
+                let t = std::time::SystemTime::now();
+                dependencies.rebuild(pack_file_decoded.get_packfiles_list());
+                dbg!(t.elapsed().unwrap());
+            }
 
             // These two belong to the network thread, not to this one!!!!
             Command::CheckUpdates | Command::CheckSchemaUpdates | Command::CheckTemplateUpdates => panic!("{}{:?}", THREADS_COMMUNICATION_ERROR, response),

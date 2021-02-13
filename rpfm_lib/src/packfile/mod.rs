@@ -23,15 +23,14 @@ use bitflags::bitflags;
 use csv::ReaderBuilder;
 use itertools::{Itertools, Either};
 use serde_derive::{Serialize, Deserialize};
-use serde_json::{from_slice, to_string_pretty};
+use serde_json::from_slice;
 use rayon::prelude::*;
 
 use std::collections::BTreeMap;
 use std::{fmt, fmt::Display};
 use std::fs::{DirBuilder, File};
-use std::io::{prelude::*, BufReader, BufWriter, SeekFrom, Read, Write};
+use std::io::{prelude::*, BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 
 use rpfm_error::{Error, ErrorKind, Result};
 use rpfm_macros::*;
@@ -40,7 +39,7 @@ use crate::GAME_SELECTED;
 use crate::SCHEMA;
 use crate::SETTINGS;
 use crate::SUPPORTED_GAMES;
-use crate::common::{*, decoder::Decoder, encoder::Encoder};
+use crate::common::*;
 use crate::dependencies::Dependencies;
 use crate::packfile::compression::*;
 use crate::packfile::crypto::*;
@@ -51,6 +50,7 @@ use crate::packedfile::table::loc::{Loc, TSV_NAME_LOC};
 
 mod compression;
 mod crypto;
+mod packfile_version;
 pub mod packedfile;
 
 #[cfg(test)]
@@ -88,6 +88,8 @@ pub const RESERVED_PACKED_FILE_NAMES: [&str; 3] = [RESERVED_NAME_EXTRA_PACKFILE,
 
 const SUBHEADER_MARK: u32 = 0x12345678;
 const SUBHEADER_VERSION: u32 = 1;
+
+const DEPENDENCY_TYPES_TO_LOAD: [PackedFileType; 2] = [PackedFileType::DB, PackedFileType::Loc];
 
 const AUTHORING_TOOL_CA: &str = "CA_TOOL";
 const AUTHORING_TOOL_RPFM: &str = "RPFM";
@@ -2076,7 +2078,7 @@ impl PackFile {
 
         // Get all the DB Tables from the main DB `PackFiles`, if it's configured.
         if let Some(paths) = main_db_pack_paths {
-            if let Ok(pack_file) = PackFile::open_packfiles(&paths, true, false, false) {
+            if let Ok(pack_file) = PackFile::open_packfiles(&paths, Some(DEPENDENCY_TYPES_TO_LOAD.to_vec()), true, false, false) {
                 for packed_file in pack_file.get_ref_packed_files_by_type(PackedFileType::DB, false) {
 
                     // Clone the PackedFile, and add it to the list.
@@ -2090,7 +2092,7 @@ impl PackFile {
 
         // Get all the Loc PackedFiles from the main Loc `PackFiles`, if it's configured.
         if let Some(paths) = main_loc_pack_paths {
-             if let Ok(pack_file) = PackFile::open_packfiles(&paths, true, false, false) {
+             if let Ok(pack_file) = PackFile::open_packfiles(&paths, Some(DEPENDENCY_TYPES_TO_LOAD.to_vec()), true, false, false) {
                 for packed_file in pack_file.get_ref_packed_files_by_type(PackedFileType::Loc, false) {
 
                     // Clone the PackedFile, and add it to the list.
@@ -2118,7 +2120,7 @@ impl PackFile {
             // First we load the content `PackFiles`.
             if let Some(ref paths) = contents_paths {
                 if let Some(path) = paths.iter().find(|x| x.file_name().unwrap().to_string_lossy() == packfile_name) {
-                    if let Ok(pack_file) = PackFile::open_packfiles(&[path.to_path_buf()], true, false, false) {
+                    if let Ok(pack_file) = PackFile::open_packfiles(&[path.to_path_buf()], Some(DEPENDENCY_TYPES_TO_LOAD.to_vec()), true, false, false) {
 
                         // Add the current `PackFile` to the done list, so we don't get into cyclic dependencies.
                         already_loaded_dependencies.push(packfile_name.to_owned());
@@ -2138,7 +2140,7 @@ impl PackFile {
             // Then we load the data `PackFiles`.
             if let Some(ref paths) = data_paths {
                 if let Some(path) = paths.iter().find(|x| x.file_name().unwrap().to_string_lossy() == packfile_name) {
-                    if let Ok(pack_file) = PackFile::open_packfiles(&[path.to_path_buf()], true, false, false) {
+                    if let Ok(pack_file) = PackFile::open_packfiles(&[path.to_path_buf()], Some(DEPENDENCY_TYPES_TO_LOAD.to_vec()), true, false, false) {
 
                         // Add the current `PackFile` to the done list, so we don't get into cyclic dependencies.
                         already_loaded_dependencies.push(packfile_name.to_owned());
@@ -2201,7 +2203,7 @@ impl PackFile {
             pack_file_path.push(x);
             pack_file_path
         }).collect::<Vec<PathBuf>>();
-        Self::open_packfiles(&pack_file_paths, true, true, true)
+        Self::open_packfiles(&pack_file_paths, None, true, true, true)
     }
 
     /// This function allows you to open one or more `PackFiles`.
@@ -2214,6 +2216,7 @@ impl PackFile {
     /// so the user cannot save it (avoiding the *"I tried to save and got an out-of-memory error!!!"* problem).
     pub fn open_packfiles(
         packs_paths: &[PathBuf],
+        types_to_load: Option<Vec<PackedFileType>>,
         use_lazy_loading: bool,
         ignore_mods: bool,
         lock_packfile: bool
@@ -2222,7 +2225,7 @@ impl PackFile {
         // If we just have one `PackFile`, just read it. No fancy logic needed. If you're an asshole and tried to break this
         // by passing it no paths, enjoy the error.
         if packs_paths.is_empty() { return Err(ErrorKind::PackFileNoPathProvided.into()) }
-        if packs_paths.len() == 1 { Self::read(&packs_paths[0], use_lazy_loading) }
+        if packs_paths.len() == 1 { Self::read(&packs_paths[0], &types_to_load, use_lazy_loading) }
 
         // Otherwise, read all of them into a *fake* `PackFile` and take care of the duplicated files like the game will do.
         else {
@@ -2242,7 +2245,7 @@ impl PackFile {
             let mut mod_files = vec![];
             let mut movie_files = vec![];
             for path in packs_paths {
-                match Self::read(&path, use_lazy_loading) {
+                match Self::read(&path, &types_to_load, use_lazy_loading) {
                     Ok(pack) => match pack.get_pfh_file_type() {
                         PFHFileType::Boot => boot_files.append(&mut pack.get_packed_files_all()),
                         PFHFileType::Release => release_files.append(&mut pack.get_packed_files_all()),
@@ -2290,398 +2293,6 @@ impl PackFile {
             // Return the new PackedFiles list.
             Ok(pack_file)
         }
-    }
-
-    /// This function reads the content of a PackFile into a `PackFile` struct.
-    pub fn read(
-        file_path: &PathBuf,
-        use_lazy_loading: bool
-    ) -> Result<Self> {
-
-        // Check if what we received is even a `PackFile`.
-        if !file_path.file_name().unwrap().to_string_lossy().to_string().ends_with(".pack") { return Err(ErrorKind::OpenPackFileInvalidExtension.into()) }
-
-        // Prepare the PackFile to be read and the virtual PackFile to be written.
-        let mut pack_file = BufReader::new(File::open(&file_path)?);
-        let pack_file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
-        let mut pack_file_decoded = Self::new();
-
-        // First, we do some quick checkings to ensure it's a valid PackFile.
-        // 24 is the bare minimum that we need to check how a PackFile should be internally, so any file with less than that is not a valid PackFile.
-        let pack_file_len = pack_file.get_ref().metadata()?.len();
-        if pack_file_len < 24 { return Err(ErrorKind::PackFileHeaderNotComplete.into()) }
-
-        // Create a little buffer to read the basic data from the header of the PackFile.
-        let mut buffer = vec![0; 24];
-        pack_file.read_exact(&mut buffer)?;
-
-        // Start populating our decoded PackFile struct.
-        pack_file_decoded.file_path = file_path.to_path_buf();
-        pack_file_decoded.pfh_version = PFHVersion::get_version(&buffer.decode_string_u8(0, 4)?)?;
-        pack_file_decoded.pfh_file_type = PFHFileType::get_type(buffer.decode_integer_u32(4)? & 15);
-        pack_file_decoded.bitmask = PFHFlags::from_bits_truncate(buffer.decode_integer_u32(4)? & !15);
-
-        // Read the data about the indexes to use it later.
-        let pack_file_count = buffer.decode_integer_u32(8)?;
-        let pack_file_index_size = buffer.decode_integer_u32(12)?;
-        let packed_file_count = buffer.decode_integer_u32(16)?;
-        let packed_file_index_size = buffer.decode_integer_u32(20)?;
-
-        // Depending on the data we got, prepare to read the header and ensure we have all the bytes we need.
-        match pack_file_decoded.pfh_version {
-
-            // PFH6 contains a subheader with some extra data we want to keep.
-            PFHVersion::PFH6 => buffer = vec![0; 308],
-
-            PFHVersion::PFH5 | PFHVersion::PFH4 => {
-                if (pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) && pack_file_len < 48) ||
-                    (!pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) && pack_file_len < 28) { return Err(ErrorKind::PackFileHeaderNotComplete.into()) }
-
-                if pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) { buffer = vec![0; 48]; }
-                else { buffer = vec![0; 28]; }
-            }
-
-            PFHVersion::PFH3 | PFHVersion::PFH2 => buffer = vec![0; 32],
-            PFHVersion::PFH0 => buffer = vec![0; 24],
-        }
-
-        // Restore the cursor of the BufReader to 0, so we can read the full header in one go. The first 24 bytes are
-        // already decoded but, for the sake of clarity in the positions of the rest of the header stuff, we do this.
-        pack_file.seek(SeekFrom::Start(0))?;
-        pack_file.read_exact(&mut buffer)?;
-
-        // The creation time is a bit of an asshole. Depending on the PackFile Version/Id/Preamble, it uses a type, another or it doesn't exists.
-        // Keep in mind that we store his raw value. If you want his legible value, you have to convert it yourself. PFH0 doesn't have it.
-        pack_file_decoded.timestamp = match pack_file_decoded.pfh_version {
-            PFHVersion::PFH6 | PFHVersion::PFH5 | PFHVersion::PFH4 => i64::from(buffer.decode_integer_u32(24)?),
-            PFHVersion::PFH3 | PFHVersion::PFH2 => (buffer.decode_integer_i64(24)? / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH,
-            PFHVersion::PFH0 => 0
-        };
-
-        if let PFHVersion::PFH6 = pack_file_decoded.pfh_version {
-            pack_file_decoded.game_version = buffer.decode_integer_u32(36)?;
-            pack_file_decoded.build_number = buffer.decode_integer_u32(40)?;
-            pack_file_decoded.authoring_tool = buffer.decode_string_u8_0padded(44, AUTHORING_TOOL_SIZE as usize)?.0;
-            pack_file_decoded.extra_subheader_data = buffer[52..].to_vec();
-        }
-
-        // Ensure the PackFile has all the data needed for the index. If the PackFile's data is encrypted
-        // and the PackFile is PFH5, due to how the encryption works, the data should start in a multiple of 8.
-        let mut data_position = u64::from(buffer.len() as u32 + pack_file_index_size + packed_file_index_size);
-        if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_DATA) &&
-            pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) &&
-            pack_file_decoded.pfh_version == PFHVersion::PFH5 {
-            data_position = if (data_position % 8) > 0 { data_position + 8 - (data_position % 8) } else { data_position };
-        }
-        if pack_file_len < data_position { return Err(ErrorKind::PackFileIndexesNotComplete.into()) }
-
-        // Create the buffers for the indexes data.
-        let mut pack_file_index = vec![0; pack_file_index_size as usize];
-        let mut packed_file_index = vec![0; packed_file_index_size as usize];
-
-        // Get the data from both indexes to their buffers.
-        pack_file.read_exact(&mut pack_file_index)?;
-        pack_file.read_exact(&mut packed_file_index)?;
-
-        // Read the PackFile Index.
-        let mut pack_file_index_position: usize = 0;
-
-        // First, we decode every entry in the PackFile index and store it. It's encoded in StringU8 terminated in 00,
-        // so we just read them char by char until hitting 0, then decode the next one and so on.
-        // NOTE: This doesn't deal with encryption, as we haven't seen any encrypted PackFile with data in this index.
-        for _ in 0..pack_file_count {
-            let pack_file_name = pack_file_index.decode_packedfile_string_u8_0terminated(pack_file_index_position, &mut pack_file_index_position)?;
-            pack_file_decoded.pack_files.push(pack_file_name);
-        }
-
-        // Depending on the version of the PackFile and his bitmask, the PackedFile index has one format or another.
-        let packed_file_index_path_offset = match pack_file_decoded.pfh_version {
-            PFHVersion::PFH6 | PFHVersion::PFH5 => {
-
-                // If it has the extended header bit, is an Arena PackFile. These ones use a normal PFH4 index format for some reason.
-                if pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) {
-                    if pack_file_decoded.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { 8 } else { 4 }
-                }
-
-                // Otherwise, it's a Warhammer 2 PackFile. These ones have 4 bytes for the size, 4 for the timestamp and 1 for the compression.
-                else if pack_file_decoded.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { 9 } else { 5 }
-            }
-
-            // If it has the last modified date of the PackedFiles, we default to 8. Otherwise, we default to 4.
-            PFHVersion::PFH4 => if pack_file_decoded.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { 8 } else { 4 }
-
-            // These are like PFH4, but the timestamp has 8 bytes instead of 4.
-            PFHVersion::PFH3 | PFHVersion::PFH2 => if pack_file_decoded.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { 12 } else { 4 }
-
-            // There isn't seem to be a bitmask in ANY PFH0 PackFile, so we will assume they didn't even use it back then.
-            PFHVersion::PFH0 => 4
-        };
-
-        // Prepare the needed stuff to read the PackedFiles.
-        let mut index_position: usize = 0;
-        let pack_file = Arc::new(Mutex::new(pack_file));
-        for packed_files_to_decode in (0..packed_file_count).rev() {
-
-            // Get his size. If it's encrypted, decrypt it first.
-            let size = if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_INDEX) {
-                let encrypted_size = packed_file_index.decode_integer_u32(index_position)?;
-                decrypt_index_item_file_length(encrypted_size, packed_files_to_decode as u32)
-            } else {
-                packed_file_index.decode_integer_u32(index_position)?
-            };
-
-            // If we have the last modified date of the PackedFiles in the Index, get it. Otherwise, default to 0,
-            // so we have something to write in case we want to enable them for our PackFile.
-            let timestamp = if pack_file_decoded.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) {
-                match pack_file_decoded.pfh_version {
-                    PFHVersion::PFH6 | PFHVersion::PFH5 | PFHVersion::PFH4 => {
-                        let timestamp = i64::from(packed_file_index.decode_integer_u32(index_position + 4)?);
-                        if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_INDEX) {
-                            i64::from(decrypt_index_item_file_length(timestamp as u32, packed_files_to_decode as u32))
-                        } else { timestamp }
-                    }
-
-                    // We haven't found a single encrypted PFH3/PFH0 PackFile to test, so always assume these are unencrypted. Also, PFH0 doesn't seem to have a timestamp.
-                    PFHVersion::PFH3 | PFHVersion::PFH2 => (packed_file_index.decode_integer_i64(index_position + 4)? / WINDOWS_TICK) - SEC_TO_UNIX_EPOCH,
-                    PFHVersion::PFH0 => 0,
-                }
-            } else { 0 };
-
-            // Update his offset, and get his compression data if it has it.
-            index_position += packed_file_index_path_offset;
-            let is_compressed = if let PFHVersion::PFH5 = pack_file_decoded.pfh_version {
-                matches!(packed_file_index.decode_bool(index_position - 1), Ok(true))
-            } else { false };
-
-            // Get his path. Like the PackFile index, it's a StringU8 terminated in 00. We get it and split it in folders for easy use.
-            let path = if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_INDEX) {
-                decrypt_index_item_filename(&packed_file_index[index_position..], size as u8, &mut index_position)
-            }
-            else { packed_file_index.decode_packedfile_string_u8_0terminated(index_position, &mut index_position)? };
-            let path = path.split('\\').map(|x| x.to_owned()).collect::<Vec<String>>();
-
-            // Once we are done, we create the PackedFile and add it to the PackedFile list.
-            let raw_data = RawPackedFile::read_from_data(
-                path,
-                pack_file_name.to_string(),
-                timestamp,
-                is_compressed,
-                if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_DATA) { Some(pack_file_decoded.pfh_version) } else { None },
-                PackedFileData::OnDisk(RawOnDisk::new(
-                    pack_file.clone(),
-                    data_position,
-                    size,
-                    is_compressed,
-                    if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_DATA) { Some(pack_file_decoded.pfh_version) } else { None },
-                ))
-            );
-
-            let mut packed_file = PackedFile::new_from_raw(&raw_data);
-
-            // If this is a notes PackedFile, save the notes and forget about the PackedFile. Otherwise, save the PackedFile.
-            if packed_file.get_path() == [RESERVED_NAME_NOTES] {
-                if let Ok(data) = packed_file.get_raw_data_and_keep_it() {
-                    if let Ok(data) = data.decode_string_u8(0, data.len()) {
-                        pack_file_decoded.notes = Some(data);
-                    }
-                }
-            }
-
-            else if packed_file.get_path() == [RESERVED_NAME_SETTINGS] {
-                if let Ok(data) = packed_file.get_raw_data_and_keep_it() {
-                    pack_file_decoded.settings = if let Ok(settings) = PackFileSettings::load(&data) {
-                        settings
-                    } else {
-                        PackFileSettings::default()
-                    };
-                }
-            }
-            else {
-                pack_file_decoded.packed_files.push(packed_file);
-            }
-
-            // Then we move our data position. For encrypted files in PFH5 PackFiles (only ARENA) we have to start the next one in a multiple of 8.
-            if pack_file_decoded.bitmask.contains(PFHFlags::HAS_ENCRYPTED_DATA) &&
-                pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) &&
-                pack_file_decoded.pfh_version == PFHVersion::PFH5 {
-                let padding = 8 - (size % 8);
-                let padded_size = if padding < 8 { size + padding } else { size };
-                data_position += u64::from(padded_size);
-            }
-            else { data_position += u64::from(size); }
-        }
-
-        // If at this point we have not reached the end of the PackFile, there is something wrong with it.
-        // NOTE: Arena PackFiles have extra data at the end. If we detect one of those PackFiles, take that into account.
-        if pack_file_decoded.pfh_version == PFHVersion::PFH5 && pack_file_decoded.bitmask.contains(PFHFlags::HAS_EXTENDED_HEADER) {
-            if data_position + 256 != pack_file_len { return Err(ErrorKind::PackFileSizeIsNotWhatWeExpect(pack_file_len, data_position).into()) }
-        }
-        else if data_position != pack_file_len { return Err(ErrorKind::PackFileSizeIsNotWhatWeExpect(pack_file_len, data_position).into()) }
-
-        // If we disabled lazy-loading, load every PackedFile to memory.
-        if !use_lazy_loading { for packed_file in &mut pack_file_decoded.packed_files { packed_file.get_ref_mut_raw().load_data()?; }}
-
-        // Return our PackFile.
-        Ok(pack_file_decoded)
-    }
-
-    /// This function tries to save a `PackFile` to a file in the filesystem.
-    ///
-    /// If no path is passed, the `PackFile` will be saved in his current path.
-    /// If a path is passed as `new_path` the `PackFile` will be saved in that path.
-    pub fn save(&mut self, new_path: Option<PathBuf>) -> Result<()> {
-
-        // If any of the problematic masks in the header is set or is one of CA's, return an error.
-        if !self.is_editable(*SETTINGS.read().unwrap().settings_bool.get("allow_editing_of_ca_packfiles").unwrap()) { return Err(ErrorKind::PackFileIsNonEditable.into()) }
-
-        // If we receive a new path, update it. Otherwise, ensure the file actually exists on disk.
-        if let Some(path) = new_path { self.set_file_path(&path)?; }
-        else if !self.get_file_path().is_file() { return Err(ErrorKind::PackFileIsNotAFile.into()) }
-
-        // Before everything else, add the file for the notes if we have them. We'll remove it later, after the file has been saved.
-        if let Some(note) = &self.notes {
-            let mut data = vec![];
-            data.encode_string_u8(&note);
-            let raw_data = RawPackedFile::read_from_vec(vec![RESERVED_NAME_NOTES.to_owned()], self.get_file_name(), 0, false, data);
-            let packed_file = PackedFile::new_from_raw(&raw_data);
-            self.packed_files.push(packed_file);
-        }
-
-        // Saving PackFile settings.
-        let mut data = vec![];
-        data.write_all(&to_string_pretty(&self.settings)?.as_bytes())?;
-        let raw_data = RawPackedFile::read_from_vec(vec![RESERVED_NAME_SETTINGS.to_owned()], self.get_file_name(), 0, false, data);
-        let packed_file = PackedFile::new_from_raw(&raw_data);
-        self.packed_files.push(packed_file);
-
-        // For some bizarre reason, if the PackedFiles are not alphabetically sorted they may or may not crash the game for particular people.
-        // So, to fix it, we have to sort all the PackedFiles here by path.
-        // NOTE: This sorting has to be CASE INSENSITIVE. This means for "ac", "Ab" and "aa" it'll be "aa", "Ab", "ac".
-        self.packed_files.sort_unstable_by_key(|a| a.get_path().join("\\").to_lowercase());
-
-        // We ensure that all the data is loaded and in his right form (compressed/encrypted) before attempting to save.
-        // We need to do this here because we need later on their compressed size.
-        for packed_file in &mut self.packed_files {
-
-            // If we decoded it, re-encode it. Otherwise, just load it.
-            packed_file.encode()?;
-
-            // Remember: first compress (only PFH5), then encrypt.
-            let (path, data, is_compressed, is_encrypted, should_be_compressed, should_be_encrypted) = packed_file.get_ref_mut_raw().get_data_and_info_from_memory()?;
-
-            // If, in any moment, we enabled/disabled the PackFile compression, compress/decompress the PackedFile. EXCEPT FOR TABLES. NEVER COMPRESS TABLES.
-            match PackedFileType::get_packed_file_type(path) {
-                PackedFileType::DB | PackedFileType::Loc => *should_be_compressed = false,
-                _ => {}
-            }
-
-            if *should_be_compressed && !*is_compressed {
-                *data = compress_data(&data)?;
-                *is_compressed = true;
-            }
-            else if !*should_be_compressed && *is_compressed {
-                *data = decompress_data(&data)?;
-                *is_compressed = false;
-            }
-
-            // Encryption is not yet supported. Unencrypt everything.
-            if is_encrypted.is_some() {
-                *data = decrypt_packed_file(&data);
-                *is_encrypted = None;
-                *should_be_encrypted = None;
-            }
-        }
-
-        // First we encode the indexes and the data (just in case we compressed it).
-        let mut pack_file_index = vec![];
-        let mut packed_file_index = vec![];
-
-        for pack_file in &self.pack_files {
-            pack_file_index.extend_from_slice(pack_file.as_bytes());
-            pack_file_index.push(0);
-        }
-
-        for packed_file in &self.packed_files {
-            packed_file_index.encode_integer_u32(packed_file.get_ref_raw().get_size());
-
-            // Depending on the version of the PackFile and his bitmask, the PackedFile index has one format or another.
-            // In PFH5 case, we don't support saving encrypted PackFiles for Arena. So we'll default to Warhammer 2 format.
-            match self.pfh_version {
-                PFHVersion::PFH6 | PFHVersion::PFH5 => {
-                    if self.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { packed_file_index.encode_integer_u32(packed_file.get_ref_raw().get_timestamp() as u32); }
-                    if packed_file.get_ref_raw().get_should_be_compressed() { packed_file_index.push(1); } else { packed_file_index.push(0); }
-                }
-                PFHVersion::PFH4 => {
-                    if self.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { packed_file_index.encode_integer_u32(packed_file.get_ref_raw().get_timestamp() as u32); }
-                }
-                PFHVersion::PFH3 | PFHVersion::PFH2 => {
-                    if self.bitmask.contains(PFHFlags::HAS_INDEX_WITH_TIMESTAMPS) { packed_file_index.encode_integer_i64(packed_file.get_ref_raw().get_timestamp()); }
-                }
-
-                // This one doesn't have timestamps, so we just skip this step.
-                PFHVersion::PFH0 => {}
-            }
-
-            packed_file_index.append(&mut packed_file.get_path().join("\\").as_bytes().to_vec());
-            packed_file_index.push(0);
-        }
-
-        // Create the file to save to, and save the header and the indexes.
-        let mut file = BufWriter::new(File::create(&self.file_path)?);
-
-        // Write the entire header.
-        let mut header = vec![];
-        header.encode_string_u8(&self.pfh_version.get_value());
-        header.encode_integer_u32(self.bitmask.bits | self.pfh_file_type.get_value());
-        header.encode_integer_u32(self.pack_files.len() as u32);
-        header.encode_integer_u32(pack_file_index.len() as u32);
-        header.encode_integer_u32(self.packed_files.len() as u32);
-        header.encode_integer_u32(packed_file_index.len() as u32);
-
-        // Update the creation time, then save it. PFH0 files don't have timestamp in the headers.
-        self.timestamp = get_current_time();
-        match self.pfh_version {
-            PFHVersion::PFH6 | PFHVersion::PFH5 | PFHVersion::PFH4 => header.encode_integer_u32(self.timestamp as u32),
-            PFHVersion::PFH3 | PFHVersion::PFH2 => header.encode_integer_i64((self.timestamp + SEC_TO_UNIX_EPOCH) * WINDOWS_TICK),
-            PFHVersion::PFH0 => {}
-        };
-
-        if let PFHVersion::PFH6 = self.pfh_version {
-            header.encode_integer_u32(SUBHEADER_MARK);
-            header.encode_integer_u32(SUBHEADER_VERSION);
-
-            // Just in case the PackFile is not up-to-date, we update it.
-            if let Ok(version_number) = get_game_selected_exe_version_number() {
-                self.set_game_version(version_number);
-            }
-
-            header.encode_integer_u32(self.game_version);
-            header.encode_integer_u32(self.build_number);
-
-            // Save it as "Made By CA" if the debug setting for it is enabled.
-            if SETTINGS.read().unwrap().settings_bool["spoof_ca_authoring_tool"] {
-                self.set_authoring_tool(AUTHORING_TOOL_CA)?;
-            }
-
-            header.encode_string_u8_0padded(&(self.authoring_tool.to_owned(), 8))?;
-            header.extend_from_slice(&self.extra_subheader_data);
-        }
-
-        // Write the indexes and the data of the PackedFiles. No need to keep the data, as it has been preloaded before.
-        file.write_all(&header)?;
-        file.write_all(&pack_file_index)?;
-        file.write_all(&packed_file_index)?;
-        for packed_file in &self.packed_files {
-            let data = packed_file.get_ref_raw().get_raw_data()?;
-            file.write_all(&data)?;
-        }
-
-        // Remove again the reserved PackedFiles.
-        self.remove_packed_file_by_path(&[RESERVED_NAME_NOTES.to_owned()]);
-        self.remove_packed_file_by_path(&[RESERVED_NAME_SETTINGS.to_owned()]);
-
-        // If nothing has failed, return success.
-        Ok(())
     }
 }
 
