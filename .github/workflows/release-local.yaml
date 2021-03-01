@@ -1,0 +1,240 @@
+name: Release-local
+
+on:
+  push:
+    branches: [ testWorkflows ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+
+        # We use self-hosted because this action often runs out of memory on github's own servers.
+        os: [self-hosted-windows]
+        include:
+
+        # Old windows configuration.
+        # No longer used due to memory problems on compilation.
+        #- {os: windows-latest, TARGET: x86_64-pc-windows-msvc, EXTENSION: zip, MIME: application/x-zip-compressed, DDISK: D}
+
+        # Self-hosted windows requires:
+        # - Windows 10 x64.
+        # - VSTools installed.
+        # - 2 disks (C: and E:).
+        - {os: self-hosted-windows, TARGET: x86_64-pc-windows-msvc, EXTENSION: zip, MIME: application/x-zip-compressed, DDISK: E}
+
+        # Self-hosted linux requires:
+        # - Ubuntu 20.04 (older versions may work, I use this one).
+        #- {os: self-hosted-ubuntu, TARGET: x86_64-pc-linux-gcc, EXTENSION: zip, MIME: application/x-zip-compressed}
+        rust:
+         - stable
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+        shell: bash
+
+      - name: Installing Qt5, KTextEditor & KImageFormats
+      - if: matrix.os == 'self-hosted-windows'
+        run: |
+          $scriptPath = ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/Frodo45127/craft/master/setup/install_craft.ps1'))
+          Invoke-Command -ScriptBlock ([scriptblock]::Create($scriptPath)) -ArgumentList "${{ matrix.DDISK }}:\Craft"
+          ${{ matrix.DDISK }}:\Craft\craft\craftenv.ps1
+          craft -i --ci-mode qtimageformats
+          craft -i --ci-mode ktexteditor
+          craft -i --ci-mode kimageformats
+        shell: pwsh
+
+      - if: matrix.os == 'self-hosted-ubuntu'
+        run: |
+          apt update
+          apt upgrade
+          apt install qt5 qt5-imageformats ktexteditor kimageformats
+        shell: bash
+
+      - name: Build RPFM
+      - if: matrix.os == 'self-hosted-windows'
+        run: |
+          ${{ matrix.DDISK }}:\Craft\craft\craftenv.ps1
+          cd ${{ matrix.DDISK }}:/a/rpfm/rpfm
+          cargo build --release
+        shell: pwsh
+
+      - if: matrix.os == 'self-hosted-ubuntu'
+        run: |
+          cd rpfm
+          cargo build --release
+        shell: bash
+
+      - name: Prepare Assets for Release (Windows)
+      - if: matrix.os == 'self-hosted-windows'
+        run: |
+          cd ${{ matrix.DDISK }}:\
+          mkdir deploy
+          cd deploy
+          mkdir rpfm-release-assets
+          cd rpfm-release-assets
+
+          # Here we copy all the dlls required by RPFM. Otherwise we'll have to manually update them on every freaking release, and for 2 months that's been a royal PITA.
+          mkdir iconengines
+          cp ${{ matrix.DDISK }}:\Craft\plugins\iconengines\KIconEnginePlugin.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\iconengines\
+          cp ${{ matrix.DDISK }}:\Craft\plugins\iconengines\qsvgicon.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\iconengines\
+
+          mkdir imageformats
+          cp ${{ matrix.DDISK }}:\Craft\plugins\imageformats\*.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\imageformats\
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/libs/qdds.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\imageformats\
+
+          mkdir platforms
+          cp ${{ matrix.DDISK }}:\Craft\plugins\platforms\qwindows.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\platforms\
+
+          mkdir styles
+          cp ${{ matrix.DDISK }}:\Craft\plugins\styles\qwindowsvistastyle.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\styles\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\d3dcompiler_47.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\git2.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\iconv.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\icudt??.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\icuin??.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\icuuc??.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\intl.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Archive.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Attica.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5AuthCore.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Codecs.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Completion.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5ConfigCore.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5ConfigGui.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5ConfigWidgets.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5CoreAddons.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Crash.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5DBusAddons.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5GlobalAccel.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5GuiAddons.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5I18n.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5IconThemes.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5ItemViews.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5JobWidgets.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5KIOCore.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5KIOGui.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5KIOWidgets.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Parts.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5Service.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5SonnetCore.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5SonnetUi.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5SyntaxHighlighting.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5TextEditor.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5TextWidgets.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5WidgetsAddons.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5WindowSystem.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\KF5XmlGui.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\libcrypto*.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\libEGL.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\libGLESV2.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\liblzma.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\libpng16.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\libssl*.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\msvcp140.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\msvcp140_1.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\msvcp140_2.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\pcre.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\pcre2-16.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Core.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5DBus.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Gui.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Network.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5PrintSupport.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Qml.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Svg.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5TextToSpeech.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Widgets.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\Qt5Xml.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          cp ${{ matrix.DDISK }}:\Craft\bin\vcruntime140.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\vcruntime140_1.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\zlib.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+          cp ${{ matrix.DDISK }}:\Craft\bin\zstd.dll ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\
+
+          # Here we copy files generated from the compilation.
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm.exe ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm.pdb ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm_ui.exe ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm_ui.pdb ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm_mod_checker.exe ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm_cli.exe ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/target/release/rpfm_cli.pdb ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+
+          # Here we copy assets from the repo.
+          mkdir img
+          mkdir locale
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/LICENSE ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/CHANGELOG.md ${{ matrix.DDISK }}:\deploy\rpfm-release-assets
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/img/* ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\img\
+          cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/locale/* ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\locale\
+          7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
+
+      - if: matrix.os == 'self-hosted-self-hosted-ubuntu'
+        run: |
+          7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
+
+      # Changelog step is common for all OS.
+      - name: Get Changelog Entry
+        id: changelog_reader
+        uses: mindsers/changelog-reader-action@v1
+        with:
+          version: Unreleased
+          path: ./CHANGELOG.md
+
+      # Create release step is common for all OS.
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release beta ${{ github.ref }}
+          body: ${{ steps.changelog_reader.outputs.log_entry }}
+          draft: true
+          prerelease: true
+
+      - name: Upload Release Asset
+      - if: matrix.os == 'self-hosted-windows'
+        id: upload-release-asset-windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ matrix.DDISK }}:/deploy/rpfm-release-assets/rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }}
+          asset_name: rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }}
+          asset_content_type: ${{ matrix.MIME }}
+
+      - if: matrix.os == 'self-hosted-self-hosted-ubuntu'
+        id: upload-release-asset-self-hosted-ubuntu
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ${{ matrix.DDISK }}:/deploy/rpfm-release-assets/rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }}
+          asset_name: rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }}
+          asset_content_type: ${{ matrix.MIME }}
