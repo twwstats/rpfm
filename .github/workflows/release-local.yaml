@@ -191,7 +191,7 @@ jobs:
           cp ${{ matrix.DDISK }}:/a/rpfm/rpfm/locale/* ${{ matrix.DDISK }}:\deploy\rpfm-release-assets\locale\
           7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
 
-      - if: matrix.os == 'self-hosted-self-hosted-ubuntu'
+      - if: matrix.os == 'self-hosted-ubuntu'
         run: |
           7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
 
@@ -228,7 +228,7 @@ jobs:
           asset_name: rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }}
           asset_content_type: ${{ matrix.MIME }}
 
-      - if: matrix.os == 'self-hosted-self-hosted-ubuntu'
+      - if: matrix.os == 'self-hosted-ubuntu'
         id: upload-release-asset-self-hosted-ubuntu
         uses: actions/upload-release-asset@v1
         env:
