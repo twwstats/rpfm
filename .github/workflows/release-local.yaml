@@ -29,7 +29,7 @@ jobs:
 
         # Self-hosted linux requires:
         # - Ubuntu 20.04 (older versions may work, I use this one).
-        #- {os: self-hosted-ubuntu, TARGET: x86_64-pc-linux-gcc, EXTENSION: zip, MIME: application/x-zip-compressed}
+        #- {os: self-hosted-ubuntu, TARGET: x86_64-unknown-linux-gnu, EXTENSION: zip, MIME: application/x-zip-compressed}
         rust:
          - stable
 
@@ -48,8 +48,8 @@ jobs:
         run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
         shell: bash
 
-      - name: Installing Qt5, KTextEditor & KImageFormats
       - if: matrix.os == 'self-hosted-windows'
+        name: Installing Qt5, KTextEditor & KImageFormats
         run: |
           $scriptPath = ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/Frodo45127/craft/master/setup/install_craft.ps1'))
           Invoke-Command -ScriptBlock ([scriptblock]::Create($scriptPath)) -ArgumentList "${{ matrix.DDISK }}:\Craft"
@@ -60,14 +60,15 @@ jobs:
         shell: pwsh
 
       - if: matrix.os == 'self-hosted-ubuntu'
+        name: Installing Qt5, KTextEditor & KImageFormats
         run: |
           apt update
           apt upgrade
           apt install qt5 qt5-imageformats ktexteditor kimageformats
         shell: bash
 
-      - name: Build RPFM
       - if: matrix.os == 'self-hosted-windows'
+        name: Build RPFM
         run: |
           ${{ matrix.DDISK }}:\Craft\craft\craftenv.ps1
           cd ${{ matrix.DDISK }}:/a/rpfm/rpfm
@@ -75,13 +76,14 @@ jobs:
         shell: pwsh
 
       - if: matrix.os == 'self-hosted-ubuntu'
+        name: Build RPFM
         run: |
           cd rpfm
           cargo build --release
         shell: bash
 
-      - name: Prepare Assets for Release (Windows)
       - if: matrix.os == 'self-hosted-windows'
+        name: Prepare Assets for Release
         run: |
           cd ${{ matrix.DDISK }}:\
           mkdir deploy
@@ -192,6 +194,7 @@ jobs:
           7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
 
       - if: matrix.os == 'self-hosted-ubuntu'
+        name: Prepare Assets for Release
         run: |
           7z a rpfm-${{ steps.get_version.outputs.VERSION }}-${{ matrix.TARGET }}.${{ matrix.EXTENSION }} .\**
 
@@ -216,8 +219,8 @@ jobs:
           draft: true
           prerelease: true
 
-      - name: Upload Release Asset
       - if: matrix.os == 'self-hosted-windows'
+        name: Upload Release Asset
         id: upload-release-asset-windows
         uses: actions/upload-release-asset@v1
         env:
@@ -229,7 +232,8 @@ jobs:
           asset_content_type: ${{ matrix.MIME }}
 
       - if: matrix.os == 'self-hosted-ubuntu'
-        id: upload-release-asset-self-hosted-ubuntu
+        name: Upload Release Asset
+        id: upload-release-asset-ubuntu
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
