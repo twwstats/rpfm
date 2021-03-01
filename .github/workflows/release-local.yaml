@@ -36,12 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: ilammy/msvc-dev-cmd@v1
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
-          components: rustfmt
+      #- uses: actions-rs/toolchain@v1
+      #  with:
+      #    profile: minimal
+      #    toolchain: ${{ matrix.rust }}
+      #    override: true
+      #    components: rustfmt
 
       - name: Get the version
         id: get_version
