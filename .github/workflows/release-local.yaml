@@ -75,6 +75,7 @@ jobs:
         name: Prepare Assets for Release
         run: |
           cd ${{ matrix.DDISK }}:\
+          rm -r -fo ${{ matrix.DDISK }}:\deploy
           mkdir deploy
           cd deploy
           mkdir rpfm-release-assets
