@@ -61,7 +61,7 @@ jobs:
         run: |
           ${{ matrix.DDISK }}:\Craft\craft\craftenv.ps1
           cd C:\actions-runner\_work\rpfm\rpfm
-          C:\Users\frodo\.cargo\bin\cargo build --release
+          cargo build --release
         shell: pwsh
 
       - if: matrix.os == 'self-hosted-ubuntu'
