@@ -46,7 +46,7 @@ fn main() {
     // Set the verbosity level and game selected, based on the arguments provided.
     let verbosity_level = if matches.occurrences_of("v") > 3 { 3 } else { matches.occurrences_of("v") as u8 };
     let packfile = matches.value_of("packfile");
-    let asskit_db_path = matches.value_of("assdb");
+    let asskit_db_path = matches.value_of("asskit_db_path");
     let game_selected = match matches.value_of("game") {
         Some(game) => game.to_owned(),
         None => "three_kingdoms".to_owned(),
@@ -70,6 +70,7 @@ fn main() {
         Some(("packfile", matches)) => commands::command_packfile(&config, matches, packfile),
         Some(("table", matches)) => commands::command_table(&config, matches, packfile),
         Some(("schema", matches)) => commands::command_schema(&config, matches),
+        Some(("twwstats", matches)) => commands::command_twwstats(&config, matches, packfile),
         _ => { Ok(()) }
     };
 

@@ -1322,8 +1322,11 @@ impl PackFile {
 
     /// This function returns a copy of the paths of all the folders in the provided `PackFile` as Strings.
     pub fn get_folder_all_paths_as_string(&self) -> HashSet<UniCase<String>> {
-        let mut folder_paths = self.packed_files.par_iter().map(|x| {
+        let mut folder_paths = self.packed_files.par_iter().filter_map(|x| {
             let path = x.get_path();
+            if path.first().unwrap() != "ui" {
+                return None
+            }
             let mut paths = Vec::with_capacity(path.len() - 1);
 
             for (index, folder) in path.iter().enumerate() {
@@ -1332,7 +1335,7 @@ impl PackFile {
                 }
             }
 
-            paths
+            Some(paths)
         }).flatten().collect::<Vec<UniCase<String>>>();
 
         folder_paths.sort();

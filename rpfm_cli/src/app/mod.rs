@@ -203,4 +203,16 @@ pub fn initialize_app<'a>() -> Command<'a> {
                 .long("xml")
                 .takes_value(false)))
 
+        // `Twwstats` Subcommand. Command to exwport tables data as JSON files.
+        .subcommand(Command::new("twwstats")
+            .about("Utility commands related to twwstats.")
+            .arg(Arg::new("export")
+                .help("Exports tables data as JSON.")
+                .short('e')
+                .long("export")
+                .value_name("DESTINATION FOLDER FOR EXPORT")
+                .takes_value(true)
+                .min_values(1)
+                .max_values(1)))
+
 }

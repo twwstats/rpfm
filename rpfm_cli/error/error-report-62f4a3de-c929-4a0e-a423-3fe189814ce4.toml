@@ -1,0 +1,79 @@
+name = 'rpfm_lib'
+crate_version = '3.0.3'
+build_type = 'Debug'
+operating_system = '''
+OS: Windows
+Version: 10.0.22000'''
+explanation = '''
+Cause: called `Option::unwrap()` on a `None` value
+Panic occurred in file 'rpfm_cli\src\commands\twwstats.rs' at line 51
+'''
+backtrace = '''
+   0:     0x7ff7bc3a9e2d - backtrace::backtrace::dbghelp::trace
+                               at C:\Users\simon\.cargo\registry\src\github.com-1ecc6299db9ec823\backtrace-0.3.64\src\backtrace\dbghelp.rs:98
+   1:     0x7ff7bc3a9e2d - backtrace::backtrace::trace_unsynchronized<backtrace::capture::impl$1::create::closure$0>
+                               at C:\Users\simon\.cargo\registry\src\github.com-1ecc6299db9ec823\backtrace-0.3.64\src\backtrace\mod.rs:66
+   2:     0x7ff7bc3a9cd0 - backtrace::backtrace::trace<backtrace::capture::impl$1::create::closure$0>
+                               at C:\Users\simon\.cargo\registry\src\github.com-1ecc6299db9ec823\backtrace-0.3.64\src\backtrace\mod.rs:53
+   3:     0x7ff7bc3a2d52 - backtrace::capture::Backtrace::create
+                               at C:\Users\simon\.cargo\registry\src\github.com-1ecc6299db9ec823\backtrace-0.3.64\src\capture.rs:176
+   4:     0x7ff7bc3a2cb9 - backtrace::capture::Backtrace::new
+                               at C:\Users\simon\.cargo\registry\src\github.com-1ecc6299db9ec823\backtrace-0.3.64\src\capture.rs:140
+   5:     0x7ff7bbe1558d - rpfm_lib::logger::Logger::new
+                               at C:\code\rpfm\rpfm_lib\src\logger\mod.rs:177
+   6:     0x7ff7bbfe6652 - rpfm_lib::logger::impl$0::init::closure$0
+                               at C:\code\rpfm\rpfm_lib\src\logger\mod.rs:137
+   7:     0x7ff7bcd37ef9 - std::panicking::rust_panic_with_hook
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:610
+   8:     0x7ff7bcd3796f - std::panicking::begin_panic_handler::closure$0
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:500
+   9:     0x7ff7bcd35577 - std::sys_common::backtrace::__rust_end_short_backtrace<std::panicking::begin_panic_handler::closure$0,never$>
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\sys_common\backtrace.rs:139
+  10:     0x7ff7bcd378f9 - std::panicking::begin_panic_handler
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:498
+  11:     0x7ff7bcf29460 - core::panicking::panic_fmt
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\core\src\panicking.rs:107
+  12:     0x7ff7bcf293ac - core::panicking::panic
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\core\src\panicking.rs:48
+  13:     0x7ff7bbca3d92 - enum$<core::option::Option<rpfm_lib::packfile::packedfile::PackedFile>, 0, 16, Some>::unwrap<rpfm_lib::packfile::packedfile::PackedFile>
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\core\src\option.rs:746
+  14:     0x7ff7bbcc46fb - rpfm_cli::commands::twwstats::export
+                               at C:\code\rpfm\rpfm_cli\src\commands\twwstats.rs:51
+  15:     0x7ff7bbca7cdf - rpfm_cli::commands::command_twwstats
+                               at C:\code\rpfm\rpfm_cli\src\commands\mod.rs:170
+  16:     0x7ff7bbca5360 - rpfm_cli::main
+                               at C:\code\rpfm\rpfm_cli\src\main.rs:73
+  17:     0x7ff7bbcb2d2b - core::ops::function::FnOnce::call_once<void (*)(),tuple$<> >
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\core\src\ops\function.rs:227
+  18:     0x7ff7bbcbb0ab - std::sys_common::backtrace::__rust_begin_short_backtrace<void (*)(),tuple$<> >
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\std\src\sys_common\backtrace.rs:123
+  19:     0x7ff7bbcb2c71 - std::rt::lang_start::closure$0<tuple$<> >
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\std\src\rt.rs:145
+  20:     0x7ff7bcd346db - core::ops::function::impls::impl$2::call_once
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\core\src\ops\function.rs:259
+  21:     0x7ff7bcd346db - std::panicking::try::do_call
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:406
+  22:     0x7ff7bcd346db - std::panicking::try
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:370
+  23:     0x7ff7bcd346db - std::panic::catch_unwind
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panic.rs:133
+  24:     0x7ff7bcd346db - std::rt::lang_start_internal::closure$2
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\rt.rs:128
+  25:     0x7ff7bcd346db - std::panicking::try::do_call
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:406
+  26:     0x7ff7bcd346db - std::panicking::try
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panicking.rs:370
+  27:     0x7ff7bcd346db - std::panic::catch_unwind
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\panic.rs:133
+  28:     0x7ff7bcd346db - std::rt::lang_start_internal
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\/library\std\src\rt.rs:128
+  29:     0x7ff7bbcb2c3f - std::rt::lang_start<tuple$<> >
+                               at /rustc/db9d1b20bba1968c1ec1fc49616d4742c1725b4b\library\std\src\rt.rs:144
+  30:     0x7ff7bbca5796 - main
+  31:     0x7ff7bcf27260 - invoke_main
+                               at d:\a01\_work\43\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:78
+  32:     0x7ff7bcf27260 - __scrt_common_main_seh
+                               at d:\a01\_work\43\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl:288
+  33:     0x7ffccc7d54e0 - BaseThreadInitThunk
+  34:     0x7ffccd94485b - RtlUserThreadStart
+'''
