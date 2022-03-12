@@ -163,21 +163,16 @@ pub fn command_diagnostic(config: &Config, matches: &ArgMatches, asskit_db_path:
 }
 
 /// This function triggers functions that require the `Schema` command.
-pub fn command_twwstats(config: &Config, matches: &ArgMatches, packfile: Option<&str>) -> Result<()> {
-    match packfile {
-        Some(packfile_path) => {
-            if matches.is_present("export") {
-                match matches.values_of("export") {
-                    Some(mut values) => {
-                        let destination_path = values.next().unwrap();
-                        twwstats::export(config, packfile_path, destination_path)
-                    },
-                    None => Err(ErrorKind::NoHTMLError("No destinatin path provided.".to_owned()).into())
-                }
-            }
-
-            else { Err(ErrorKind::NoHTMLError("No valid argument provided.".to_owned()).into()) }
+pub fn command_twwstats(config: &Config, matches: &ArgMatches) -> Result<()> {
+    if matches.is_present("export") {
+        match matches.values_of("export") {
+            Some(mut values) => {
+                let destination_path = values.next().unwrap();
+                twwstats::export(config, destination_path)
+            },
+            None => Err(ErrorKind::NoHTMLError("No destinatin path provided.".to_owned()).into())
         }
-        None => Err(ErrorKind::NoHTMLError("No PackFile provided.".to_owned()).into()),
     }
+
+    else { Err(ErrorKind::NoHTMLError("No valid argument provided.".to_owned()).into()) }
 }

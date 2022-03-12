@@ -70,7 +70,7 @@ fn main() {
         Some(("packfile", matches)) => commands::command_packfile(&config, matches, packfile),
         Some(("table", matches)) => commands::command_table(&config, matches, packfile),
         Some(("schema", matches)) => commands::command_schema(&config, matches),
-        Some(("twwstats", matches)) => commands::command_twwstats(&config, matches, packfile),
+        Some(("twwstats", matches)) => commands::command_twwstats(&config, matches),
         _ => { Ok(()) }
     };
 

@@ -1,0 +1,20 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "(Windows) Launch",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/rpfm_cli.exe",
+      "args": ["-v", "-g", "warhammer_3", "twwstats", "-e", "C:/code/twwstats/twwstats_data/export/1"],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/rpfm_cli",
+      "environment": [],
+      "console": "externalTerminal",
+      "preLaunchTask": "rpfm_cli build"
+    }
+  ]
+}
